@@ -1,10 +1,8 @@
 import sys
-from math import radians
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Geom, GeomNode, GeomVertexFormat, GeomVertexData, GeomTriangles, GeomLines, GeomVertexWriter
 from panda3d.core import AmbientLight, DirectionalLight, PointLight, Vec4
-from panda3d.core import LPoint3, LVector3, LVector4
-from panda3d.core import ColorBlendAttrib
+from panda3d.core import LVector3, LVector4
 from panda3d.core import Texture, PNMImage, LColor
 from panda3d.core import TransparencyAttrib
 from panda3d.core import LODNode
@@ -15,8 +13,8 @@ from geopy.geocoders import Nominatim
 import osmnx as ox
 from geopy.exc import GeocoderTimedOut
 from time import sleep
-from direct.gui.OnscreenText import OnscreenText
-from direct.gui.DirectGui import DirectButton
+from direct.gui.DirectGui import DirectButton, DirectFrame
+from direct.showbase.ShowBase import ShowBase
 from shapely.geometry import Polygon
 from shapely.ops import triangulate
 import random
@@ -43,16 +41,17 @@ class MyApp(ShowBase):
         # Set the background color to black
         self.setBackgroundColor(0, 0, 0)
 
-        # Create an exit button
-        self.exit_button = DirectButton(text=("Exit", "Exit", "Exit", "Exit"), scale=.05,
-                                        command=sys.exit, pos=(-1, 0, -0.9), 
+        self.exit_button = DirectButton(text=("Exit", "Exit", "Exit", "Exit"), 
+                                        scale=.05,
+                                        command=sys.exit, 
+                                        pos=(-1.2, 0, 0.9), 
                                         text_align=TextNode.ALeft,
                                         frameColor=(0, 0, 0, 0),
                                         text_fg=(1, 0, 0, 1),
                                         text_shadow=(0, 0, 0, 1))
 
         # Get building and road data
-        place_name = "Sunset Boulevard, Los Angeles, California, USA"
+        place_name = "Santa Monica Beach, California, USA"
         geolocator = Nominatim(user_agent="your_app_name", timeout=10)
 
         location = do_geocode(geolocator, place_name)
@@ -60,8 +59,8 @@ class MyApp(ShowBase):
         if location:
             point = (location.latitude, location.longitude)
             tags = {"building": True}
-            osm_data = ox.features_from_point(point, tags=tags, dist=150) # dist=1000
-            road_data = ox.graph_from_point(point, dist=150, network_type='all')
+            osm_data = ox.features_from_point(point, tags=tags, dist=750) # dist=1000
+            road_data = ox.graph_from_point(point, dist=750, network_type='all')
         else:
             print("Error: Location not found")
 

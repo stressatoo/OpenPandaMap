@@ -2,18 +2,21 @@ import sys
 from math import radians
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Geom, GeomNode, GeomVertexFormat, GeomVertexData, GeomTriangles, GeomLines, GeomVertexWriter
-from panda3d.core import AmbientLight, DirectionalLight
+from panda3d.core import AmbientLight, DirectionalLight, PointLight, Vec4
 from panda3d.core import LPoint3, LVector3, LVector4
-from panda3d.core import TextNode
 from panda3d.core import ColorBlendAttrib
 from panda3d.core import Texture, PNMImage, LColor
 from panda3d.core import TransparencyAttrib
 from panda3d.core import LODNode
+from panda3d.core import CardMaker
+from panda3d.core import loadPrcFileData
+from panda3d.core import TextNode
 from geopy.geocoders import Nominatim
 import osmnx as ox
 from geopy.exc import GeocoderTimedOut
 from time import sleep
 from direct.gui.OnscreenText import OnscreenText
+from direct.gui.DirectGui import DirectButton
 from shapely.geometry import Polygon
 from shapely.ops import triangulate
 import random
@@ -30,12 +33,23 @@ def do_geocode(geolocator, address, attempt=1, max_attempts=5):
 class MyApp(ShowBase):
 
     def __init__(self):
+        loadPrcFileData("", "fullscreen true")
+        loadPrcFileData("", "win-size 1920 1080")  # Set the resolution
+
         ShowBase.__init__(self)
 
         base.setFrameRateMeter(True)
 
         # Set the background color to black
         self.setBackgroundColor(0, 0, 0)
+
+        # Create an exit button
+        self.exit_button = DirectButton(text=("Exit", "Exit", "Exit", "Exit"), scale=.05,
+                                        command=sys.exit, pos=(-1, 0, -0.9), 
+                                        text_align=TextNode.ALeft,
+                                        frameColor=(0, 0, 0, 0),
+                                        text_fg=(1, 0, 0, 1),
+                                        text_shadow=(0, 0, 0, 1))
 
         # Get building and road data
         place_name = "Sunset Boulevard, Los Angeles, California, USA"
@@ -85,7 +99,64 @@ class MyApp(ShowBase):
         self.render.setLight(self.render.attachNewNode(directional_light))
 
 
-# ... (previous code remains unchanged)
+    def create_grass(self, x, y, width, height):
+        # Create a green plane
+        grass = GeomNode('grass')
+        grass_node = self.render.attachNewNode(grass)
+        grass_node.setColor(0, 1, 0, 1)  # green color
+
+        # Set the position and scale of the plane
+        grass_node.setPos(x * 100000, y * 100000, 0)
+        grass_node.setScale(width * 100000, height * 100000, 1)
+
+
+    def create_street_lamp(self, x, y):
+        # Create a tall, thin rectangle for the lamp post
+        cm = CardMaker('lamp_post')
+        cm.setFrame(-0.05, 0.05, 0, 1)  # create a rectangle
+        lamp_post = self.render.attachNewNode(cm.generate())
+        lamp_post.setPos(x * 100000, y * 100000, 0.5)
+        lamp_post.setColor(0.5, 0.5, 0.5, 1)  # gray color
+
+        # Create a small sphere for the lamp
+        lamp = self.loader.loadModel('models/smiley')
+        lamp.reparentTo(self.render)
+        lamp.setScale(0.05)
+        lamp.setPos(x * 100000, y * 100000, 1)
+
+        # Create a point light at the position of the lamp
+        point_light = PointLight('point_light')
+        point_light.setColor(Vec4(1, 1, 1, 1))
+        plnp = lamp.attachNewNode(point_light)
+        self.render.setLight(plnp)
+
+    def create_traffic_light(self, x, y):
+        # Create a thin rectangle for the traffic light
+        cm = CardMaker('traffic_light')
+        cm.setFrame(-0.05, 0.05, 0, 0.3)  # create a rectangle
+        traffic_light = self.render.attachNewNode(cm.generate())
+        traffic_light.setPos(x * 100000, y * 100000, 0.5)
+        traffic_light.setColor(0, 0, 0, 1)  # black color
+
+        # Create small spheres for the lights
+        red_light = self.loader.loadModel('models/smiley')
+        red_light.reparentTo(self.render)
+        red_light.setScale(0.02)
+        red_light.setPos(x * 100000, y * 100000, 0.6)
+        red_light.setColor(1, 0, 0, 1)  # red
+
+        yellow_light = self.loader.loadModel('models/smiley')
+        yellow_light.reparentTo(self.render)
+        yellow_light.setScale(0.02)
+        yellow_light.setPos(x * 100000, y * 100000, 0.5)
+        yellow_light.setColor(1, 1, 0, 1)  # yellow
+
+        green_light = self.loader.loadModel('models/smiley')
+        green_light.reparentTo(self.render)
+        green_light.setScale(0.02)
+        green_light.setPos(x * 100000, y * 100000, 0.4)
+        green_light.setColor(0, 1, 0, 1)  # green
+
     def create_building(self, polygon, location):
         format = GeomVertexFormat.getV3()
         vdata = GeomVertexData('vertices', format, Geom.UHStatic)
@@ -249,6 +320,19 @@ class MyApp(ShowBase):
 
         # Set the road width
         road_node.setRenderModeThickness(2)
+
+        # Create street lamps and traffic lights along the road
+        for i, (x, y) in enumerate(line.coords):
+            # Convert coordinates to a local coordinate system
+            x, y = x - location.longitude, y - location.latitude
+
+            # Create a street lamp at every 5th point
+            if i % 5 == 0:
+                self.create_street_lamp(x, y)
+
+            # Create a traffic light at every 10th point
+            if i % 10 == 0:
+                self.create_traffic_light(x, y)
 
 app = MyApp()
 app.run()

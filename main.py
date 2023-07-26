@@ -8,6 +8,7 @@ from panda3d.core import TextNode
 from panda3d.core import ColorBlendAttrib
 from panda3d.core import Texture, PNMImage, LColor
 from panda3d.core import TransparencyAttrib
+from panda3d.core import LODNode
 from geopy.geocoders import Nominatim
 import osmnx as ox
 from geopy.exc import GeocoderTimedOut
@@ -15,6 +16,7 @@ from time import sleep
 from direct.gui.OnscreenText import OnscreenText
 from shapely.geometry import Polygon
 from shapely.ops import triangulate
+import random
 
 def do_geocode(geolocator, address, attempt=1, max_attempts=5):
     try:
@@ -131,68 +133,66 @@ class MyApp(ShowBase):
         node_roof = GeomNode('gnode')
         node_roof.addGeom(geom_roof)
 
-        # Create a blue semi-transparent texture
+        # Create a random blue color
+        r, g, b = random.uniform(0, 0.5), random.uniform(0.5, 1), random.uniform(0.5, 1)
+
+        # Create a semi-transparent texture
         image = PNMImage(1, 1)
-        image.setXelA(0, 0, LColor(0, 0, 1, 0.5))  # set the color to blue and alpha to 0.5
+        image.setXelA(0, 0, LColor(r, g, b, 0.5))  # set the color to random blue and alpha to 0.5
         texture = Texture()
         texture.load(image)
 
-        # Set building color to blue
+        # Set building color to random blue
         building_node = self.render.attachNewNode(node)
-        building_node.setColor(0.00392, 0.10980, 0.30980, 1)
+        building_node.setColor(r, g, b, 1)
         building_node.setTexture(texture, 1)
         building_node.setTransparency(TransparencyAttrib.MAlpha)
 
-        # Set roof color to blue
+        # Set roof color to random blue
         roof_node = self.render.attachNewNode(node_roof)
-        roof_node.setColor(0.00392, 0.10980, 0.30980, 1)
+        roof_node.setColor(r, g, b, 1)
         roof_node.setTexture(texture, 1)
         roof_node.setTransparency(TransparencyAttrib.MAlpha)
 
         print("Building node created and colored")
 
+
         # Create windows
         window_color = (0.8, 0.8, 0.8, 1)
         window_width, window_height = 1, 2
-        windows_node = self.render.attachNewNode('windows')
-        windows_node.setColor(*window_color)
 
-        vdata_windows = GeomVertexData('vertices', format, Geom.UHStatic)
-        vertex_windows = GeomVertexWriter(vdata_windows, 'vertex')
-        geom_windows = Geom(vdata_windows)
+        lod_node = LODNode('lod')
+        lod = building_node.attachNewNode(lod_node)
+        lod_node.addSwitch(500, 200)  # Less detailed windows between 200 and 500 units
+        lod_node.addSwitch(200, 0)    # Detailed windows up to 200 units
 
-        for x, y in polygon.exterior.coords[:-1]:
-            # Convert coordinates to a local coordinate system
-            x, y = x - location.longitude, y - location.latitude
+        for detail, z_step in [(0, window_height * 4), (1, window_height * 2)]:
+            windows_node = lod.attachNewNode('windows')
+            windows_node.setColor(*window_color)
 
-            # Calculate distance from the camera to the building
-            camera_x, camera_y, camera_z = self.camera.getPos()
-            distance = ((x * 100000 - camera_x) ** 2 + (y * 100000 - camera_y) ** 2) ** 0.5
+            vdata_windows = GeomVertexData('vertices', format, Geom.UHStatic)
+            vertex_windows = GeomVertexWriter(vdata_windows, 'vertex')
+            geom_windows = Geom(vdata_windows)
 
-            # Choose the level of detail based on the distance
-            if distance < 200:
-                z_range = range(0, 10 * 10, window_height * 2)  # High level of detail
-            elif distance < 500:
-                z_range = range(0, 10 * 10, window_height * 4)  # Medium level of detail
-            else:
-                continue  # Low level of detail (no windows)
+            for x, y in polygon.exterior.coords[:-1]:
+                x, y = x - location.longitude, y - location.latitude
 
-            for z in z_range:
-                start = vdata_windows.getNumRows()
-                vertex_windows.addData3(x * 100000 + window_width / 2, y * 100000, z)
-                vertex_windows.addData3(x * 100000 + window_width / 2, y * 100000, z + window_height)
-                vertex_windows.addData3(x * 100000 - window_width / 2, y * 100000, z + window_height)
-                vertex_windows.addData3(x * 100000 - window_width / 2, y * 100000, z)
+                for z in range(0, 10 * 10, z_step):
+                    start = vdata_windows.getNumRows()
+                    vertex_windows.addData3(x * 100000 + window_width / 2, y * 100000, z)
+                    vertex_windows.addData3(x * 100000 + window_width / 2, y * 100000, z + window_height)
+                    vertex_windows.addData3(x * 100000 - window_width / 2, y * 100000, z + window_height)
+                    vertex_windows.addData3(x * 100000 - window_width / 2, y * 100000, z)
 
-                prim_window = GeomTriangles(Geom.UHStatic)
-                prim_window.addVertices(start, start + 1, start + 2)
-                prim_window.addVertices(start + 2, start + 3, start)
+                    prim_window = GeomTriangles(Geom.UHStatic)
+                    prim_window.addVertices(start, start + 1, start + 2)
+                    prim_window.addVertices(start + 2, start + 3, start)
 
-                geom_windows.addPrimitive(prim_window)
+                    geom_windows.addPrimitive(prim_window)
 
-        node_windows = GeomNode('gnode')
-        node_windows.addGeom(geom_windows)
-        windows_node.attachNewNode(node_windows)
+            node_windows = GeomNode('gnode')
+            node_windows.addGeom(geom_windows)
+            windows_node.attachNewNode(node_windows)
 
         print("Windows created")
 

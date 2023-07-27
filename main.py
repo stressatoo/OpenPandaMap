@@ -19,6 +19,7 @@ from shapely.geometry import Polygon
 from shapely.ops import triangulate
 import random
 
+
 def do_geocode(geolocator, address, attempt=1, max_attempts=5):
     try:
         return geolocator.geocode(address)
@@ -37,6 +38,8 @@ class MyApp(ShowBase):
         ShowBase.__init__(self)
 
         base.setFrameRateMeter(True)
+        
+        self.accept('mouse1', self.show_mouse_position)
 
         # Set the background color to black
         self.setBackgroundColor(0, 0, 0)
@@ -59,11 +62,11 @@ class MyApp(ShowBase):
         if location:
             point = (location.latitude, location.longitude)
             tags = {"building": True}
-            osm_data = ox.features_from_point(point, tags=tags, dist=500) # dist=1000
-            road_data = ox.graph_from_point(point, dist=500, network_type='all')
+            osm_data = ox.features_from_point(point, tags=tags, dist=750) # dist=1000
+            road_data = ox.graph_from_point(point, dist=750, network_type='all')
             
-            water_tags = {"natural": True}
-            water_data = ox.features_from_point(point, tags=water_tags, dist=750)
+            water_tags = {"natural": "water", "water": ["sea", "ocean"]}
+            water_data = ox.features_from_point(point, tags=water_tags, dist=1250)
         else:
             print("Error: Location not found")
 
@@ -110,6 +113,19 @@ class MyApp(ShowBase):
         self.render.setLight(self.render.attachNewNode(directional_light))
 
 
+    def show_mouse_position(self):
+        # Check if the mouse is within the window
+        if self.mouseWatcherNode.hasMouse():
+            # Get the mouse position
+            mouse_position = self.mouseWatcherNode.getMouse()
+            
+            # Convert the mouse position to world coordinates
+            mouse_x = mouse_position.getX() * self.win.getXSize() / 2
+            mouse_y = mouse_position.getY() * self.win.getYSize() / 2
+
+            print(f"Mouse position: x={mouse_x}, y={mouse_y}")
+
+
     def create_grass(self, x, y, width, height):
         # Create a green plane
         grass = GeomNode('grass')
@@ -141,6 +157,7 @@ class MyApp(ShowBase):
         plnp = lamp.attachNewNode(point_light)
         self.render.setLight(plnp)
 
+
     def create_traffic_light(self, x, y):
         # Create a thin rectangle for the traffic light
         cm = CardMaker('traffic_light')
@@ -167,6 +184,7 @@ class MyApp(ShowBase):
         green_light.setScale(0.02)
         green_light.setPos(x * 100000, y * 100000, 0.4)
         green_light.setColor(0, 1, 0, 1)  # green
+
 
     def create_building(self, polygon, location):
         format = GeomVertexFormat.getV3()
@@ -238,7 +256,6 @@ class MyApp(ShowBase):
 
         print("Building node created and colored")
 
-
         # Create windows
         window_color = (0.8, 0.8, 0.8, 1)
         window_width, window_height = 1, 2
@@ -303,6 +320,7 @@ class MyApp(ShowBase):
         window_node = self.render.attachNewNode(node)
         return window_node
 
+
     def create_road(self, line, location):
         format = GeomVertexFormat.getV3()
         vdata= GeomVertexData('vertices', format, Geom.UHStatic)
@@ -345,34 +363,44 @@ class MyApp(ShowBase):
             if i % 10 == 0:
                 self.create_traffic_light(x, y)
 
-    def create_water_body(self, polygon, location):
-        format = GeomVertexFormat.getV3()
-        vdata = GeomVertexData('vertices', format, Geom.UHStatic)
 
-        # Vertices for the water body
-        vdata.setNumRows(len(polygon.exterior.coords))
+    def create_water_body(self, polygon, location):
+        format = GeomVertexFormat.getV3()  # Format with just the position
+        vdata = GeomVertexData('water', format, Geom.UHStatic)
 
         vertex = GeomVertexWriter(vdata, 'vertex')
-        for x, y in polygon.exterior.coords[:-1]:
-            x, y = x - location.longitude, y - location.latitude
-            vertex.addData3(x * 100000, y * 100000, 0)
 
         prim = GeomTriangles(Geom.UHStatic)
-        for i in range(0, len(polygon.exterior.coords) - 2):
-            prim.addVertices(i, i + 1, i + 2)
+
+        if polygon.geom_type == 'Polygon':
+            polygons = [polygon]
+        elif polygon.geom_type == 'MultiPolygon':
+            polygons = list(polygon)
+        else:
+            return
+
+        for polygon in polygons:
+            # Vertices for the water body
+            for i, (x, y) in enumerate(polygon.exterior.coords[:-1]):
+                x, y = x - location.longitude, y - location.latitude
+                vertex.addData3(x * 100000, y * 100000, 0)
+
+            # Triangles for the water body
+            for i in range(len(polygon.exterior.coords) - 3):
+                prim.addVertices(i, i + 1, i + 2)
 
         geom = Geom(vdata)
         geom.addPrimitive(prim)
 
-        node = GeomNode('gnode')
+        node = GeomNode('water')
         node.addGeom(geom)
 
-        # Set water color to blue
+        # Add the water body to the scene
         water_node = self.render.attachNewNode(node)
-        water_node.setColor(0, 0, 1, 1)
-        
+        water_node.setColor(0, 0, 1, 1)  # Set water color to blue
+
         print("Water body created")
             
-
+            
 app = MyApp()
 app.run()

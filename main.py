@@ -17,6 +17,7 @@ from panda3d.core import LODNode
 from panda3d.core import CardMaker
 from panda3d.core import loadPrcFileData
 from panda3d.core import TextNode
+from panda3d.core import CollisionRay, CollisionNode, CollisionTraverser, CollisionHandlerQueue
 
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
@@ -67,11 +68,11 @@ class MyApp(ShowBase):
         if location:
             point = (location.latitude, location.longitude)
             tags = {"building": True}
-            osm_data = ox.features_from_point(point, tags=tags, dist=750) # dist=1000
-            road_data = ox.graph_from_point(point, dist=750, network_type='all')
+            osm_data = ox.features_from_point(point, tags=tags, dist=600) # dist=1000
+            road_data = ox.graph_from_point(point, dist=600, network_type='all')
             
-            water_tags = {"natural": "water", "water": ["sea", "ocean"]}
-            water_data = ox.features_from_point(point, tags=water_tags, dist=1250)
+            water_tags = {"natural": ["water", "coastline"], "water": ["sea", "ocean", "lake"]}            
+            water_data = ox.features_from_point(point, tags=water_tags, dist=600)
         else:
             print("Error: Location not found")
 
@@ -123,18 +124,54 @@ class MyApp(ShowBase):
         if self.mouseWatcherNode.hasMouse():
             # Get the mouse position
             mouse_position = self.mouseWatcherNode.getMouse()
-            
+
             # Convert the mouse position to world coordinates
             mouse_x = mouse_position.getX() * self.win.getXSize() / 2
             mouse_y = mouse_position.getY() * self.win.getYSize() / 2
 
             print(f"Mouse position: x={mouse_x}, y={mouse_y}")
 
+            # Create a collision ray that starts at the camera and goes through the mouse position
+            picker_ray = CollisionRay()
+            picker_ray.setFromLens(self.camNode, mouse_position.getX(), mouse_position.getY())
 
+            # Create a collision node to hold the ray, and attach it to the camera
+            picker_node = CollisionNode('picker')
+            picker_node.addSolid(picker_ray)
+            picker_node.setFromCollideMask(GeomNode.getDefaultCollideMask())
+            picker_node_path = self.camera.attachNewNode(picker_node)
+
+            # The collision traverser will check for collisions between the ray and the scene
+            traverser = CollisionTraverser()
+            queue = CollisionHandlerQueue()
+
+            # Add the collision node to the traverser
+            traverser.addCollider(picker_node_path, queue)
+
+            # Check for collisions
+            traverser.traverse(self.render)
+
+            if queue.getNumEntries() > 0:
+                # Sort the collision entries by distance from the camera
+                queue.sortEntries()
+
+                # Get the first collision entry
+                entry = queue.getEntry(0)
+
+                # Get the node that the ray collided with
+                collided_node = entry.getIntoNodePath().findNetTag('type')
+
+                if not collided_node.isEmpty():
+                    print(f"Selected object: {collided_node.getName()}")
+                else:
+                    print("No object selected")
+
+                    
     def create_grass(self, x, y, width, height):
         # Create a green plane
         grass = GeomNode('grass')
         grass_node = self.render.attachNewNode(grass)
+        grass_node.setTag('type', 'grass')
         grass_node.setColor(0, 1, 0, 1)  # green color
 
         # Set the position and scale of the plane
@@ -212,7 +249,7 @@ class MyApp(ShowBase):
         geom = Geom(vdata)
         geom.addPrimitive(prim)
 
-        node = GeomNode('gnode')
+        node = GeomNode('building')
         node.addGeom(geom)
 
         # Create the roof
@@ -235,7 +272,7 @@ class MyApp(ShowBase):
         geom_roof = Geom(vdata_roof)
         geom_roof.addPrimitive(prim_roof)
 
-        node_roof = GeomNode('gnode')
+        node_roof = GeomNode('roof')
         node_roof.addGeom(geom_roof)
 
         # Create a random blue color
@@ -249,12 +286,14 @@ class MyApp(ShowBase):
 
         # Set building color to random blue
         building_node = self.render.attachNewNode(node)
+        building_node.setTag('type', 'building')
         building_node.setColor(r, g, b, 1)
         building_node.setTexture(texture, 1)
         building_node.setTransparency(TransparencyAttrib.MAlpha)
 
         # Set roof color to random blue
         roof_node = self.render.attachNewNode(node_roof)
+        roof_node.setTag('type', 'roof')
         roof_node.setColor(r, g, b, 1)
         roof_node.setTexture(texture, 1)
         roof_node.setTransparency(TransparencyAttrib.MAlpha)
@@ -294,7 +333,7 @@ class MyApp(ShowBase):
 
                     geom_windows.addPrimitive(prim_window)
 
-            node_windows = GeomNode('gnode')
+            node_windows = GeomNode('windows')
             node_windows.addGeom(geom_windows)
             windows_node.attachNewNode(node_windows)
 
@@ -319,10 +358,11 @@ class MyApp(ShowBase):
         geom = Geom(vdata)
         geom.addPrimitive(prim)
 
-        node = GeomNode('gnode')
+        node = GeomNode('window')
         node.addGeom(geom)
 
         window_node = self.render.attachNewNode(node)
+        window_node.setTag('type', 'window')
         return window_node
 
 
@@ -345,11 +385,12 @@ class MyApp(ShowBase):
         geom = Geom(vdata)
         geom.addPrimitive(prim)
 
-        node = GeomNode('gnode')
+        node = GeomNode('road')
         node.addGeom(geom)
 
         # Set road color to white
         road_node = self.render.attachNewNode(node)
+        road_node.setTag('type', 'road')
         road_node.setColor(1, 1, 1, 1)
 
         # Set the road width
@@ -402,6 +443,7 @@ class MyApp(ShowBase):
 
         # Add the water body to the scene
         water_node = self.render.attachNewNode(node)
+        water_node.setTag('type', 'water')
         water_node.setColor(0, 0, 1, 1)  # Set water color to blue
 
         print("Water body created")

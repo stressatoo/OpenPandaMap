@@ -72,7 +72,7 @@ class MyApp(ShowBase):
             road_data = ox.graph_from_point(point, dist=600, network_type='all')
             
             water_tags = {"natural": ["water", "coastline"], "water": ["sea", "ocean", "lake"]}            
-            water_data = ox.features_from_point(point, tags=water_tags, dist=600)
+            water_data = ox.features_from_point(point, tags=water_tags, dist=3500)
         else:
             print("Error: Location not found")
 

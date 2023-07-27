@@ -365,7 +365,7 @@ class MyApp(ShowBase):
                 self.create_street_lamp(x, y)
 
             # Create a traffic light at every 10th point
-            if i % 10 == 0:
+            if i % 100 == 0:
                 self.create_traffic_light(x, y)
 
 

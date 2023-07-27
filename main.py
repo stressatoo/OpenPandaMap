@@ -51,7 +51,7 @@ class MyApp(ShowBase):
                                         text_shadow=(0, 0, 0, 1))
 
         # Get building and road data
-        place_name = "Santa Monica Beach, California, USA"
+        place_name = "Santa Monica Pier, California, USA"
         geolocator = Nominatim(user_agent="your_app_name", timeout=10)
 
         location = do_geocode(geolocator, place_name)
@@ -59,8 +59,11 @@ class MyApp(ShowBase):
         if location:
             point = (location.latitude, location.longitude)
             tags = {"building": True}
-            osm_data = ox.features_from_point(point, tags=tags, dist=750) # dist=1000
-            road_data = ox.graph_from_point(point, dist=750, network_type='all')
+            osm_data = ox.features_from_point(point, tags=tags, dist=500) # dist=1000
+            road_data = ox.graph_from_point(point, dist=500, network_type='all')
+            
+            water_tags = {"natural": True}
+            water_data = ox.features_from_point(point, tags=water_tags, dist=750)
         else:
             print("Error: Location not found")
 
@@ -82,6 +85,15 @@ class MyApp(ShowBase):
                     self.create_road(geometry, location)
             except Exception as e:
                 print(f"Error drawing road: {e}")
+
+        # Create water models and add them to the scene
+        for _, water in water_data.iterrows():
+            try:
+                geometry = water['geometry']
+                if geometry.geom_type == 'Polygon':
+                    self.create_water_body(geometry, location)
+            except Exception as e:
+                print(f"Error drawing water body: {e}")
 
         # Set up the camera
         self.camera.set_pos(0, -50, 50)
@@ -332,6 +344,35 @@ class MyApp(ShowBase):
             # Create a traffic light at every 10th point
             if i % 10 == 0:
                 self.create_traffic_light(x, y)
+
+    def create_water_body(self, polygon, location):
+        format = GeomVertexFormat.getV3()
+        vdata = GeomVertexData('vertices', format, Geom.UHStatic)
+
+        # Vertices for the water body
+        vdata.setNumRows(len(polygon.exterior.coords))
+
+        vertex = GeomVertexWriter(vdata, 'vertex')
+        for x, y in polygon.exterior.coords[:-1]:
+            x, y = x - location.longitude, y - location.latitude
+            vertex.addData3(x * 100000, y * 100000, 0)
+
+        prim = GeomTriangles(Geom.UHStatic)
+        for i in range(0, len(polygon.exterior.coords) - 2):
+            prim.addVertices(i, i + 1, i + 2)
+
+        geom = Geom(vdata)
+        geom.addPrimitive(prim)
+
+        node = GeomNode('gnode')
+        node.addGeom(geom)
+
+        # Set water color to blue
+        water_node = self.render.attachNewNode(node)
+        water_node.setColor(0, 0, 1, 1)
+        
+        print("Water body created")
+            
 
 app = MyApp()
 app.run()

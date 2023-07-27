@@ -166,7 +166,7 @@ class MyApp(ShowBase):
                 else:
                     print("No object selected")
 
-                    
+    """       
     def create_grass(self, x, y, width, height):
         # Create a green plane
         grass = GeomNode('grass')
@@ -226,7 +226,7 @@ class MyApp(ShowBase):
         green_light.setScale(0.02)
         green_light.setPos(x * 100000, y * 100000, 0.4)
         green_light.setColor(0, 1, 0, 1)  # green
-
+    """
 
     def create_building(self, polygon, location):
         format = GeomVertexFormat.getV3()
@@ -299,7 +299,7 @@ class MyApp(ShowBase):
         roof_node.setTransparency(TransparencyAttrib.MAlpha)
 
         print("Building node created and colored")
-
+        """
         # Create windows
         window_color = (0.8, 0.8, 0.8, 1)
         window_width, window_height = 1, 2
@@ -409,7 +409,7 @@ class MyApp(ShowBase):
             if i % 100 == 0:
                 self.create_traffic_light(x, y)
 
-
+        """
     def create_water_body(self, polygon, location):
         format = GeomVertexFormat.getV3()  # Format with just the position
         vdata = GeomVertexData('water', format, Geom.UHStatic)

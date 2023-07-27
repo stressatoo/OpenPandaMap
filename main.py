@@ -1,5 +1,13 @@
 import sys
+import random
+import osmnx as ox
+
+from time import sleep
+
+from direct.gui.DirectGui import DirectButton, DirectFrame
 from direct.showbase.ShowBase import ShowBase
+from direct.showbase.ShowBase import ShowBase
+
 from panda3d.core import Geom, GeomNode, GeomVertexFormat, GeomVertexData, GeomTriangles, GeomLines, GeomVertexWriter
 from panda3d.core import AmbientLight, DirectionalLight, PointLight, Vec4
 from panda3d.core import LVector3, LVector4
@@ -9,15 +17,12 @@ from panda3d.core import LODNode
 from panda3d.core import CardMaker
 from panda3d.core import loadPrcFileData
 from panda3d.core import TextNode
+
 from geopy.geocoders import Nominatim
-import osmnx as ox
 from geopy.exc import GeocoderTimedOut
-from time import sleep
-from direct.gui.DirectGui import DirectButton, DirectFrame
-from direct.showbase.ShowBase import ShowBase
+
 from shapely.geometry import Polygon
 from shapely.ops import triangulate
-import random
 
 
 def do_geocode(geolocator, address, attempt=1, max_attempts=5):
@@ -401,6 +406,6 @@ class MyApp(ShowBase):
 
         print("Water body created")
             
-            
+
 app = MyApp()
 app.run()

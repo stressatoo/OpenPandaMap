@@ -25,6 +25,8 @@ from geopy.exc import GeocoderTimedOut
 from shapely.geometry import Polygon
 from shapely.ops import triangulate
 
+from manipulator import Manipulator
+
 
 def do_geocode(geolocator, address, attempt=1, max_attempts=5):
     try:
@@ -45,6 +47,8 @@ class MyApp(ShowBase):
 
         base.setFrameRateMeter(True)
         
+        self.manipulator = Manipulator(self)
+
         self.accept('mouse1', self.show_mouse_position)
 
         # Set the background color to black
@@ -60,7 +64,7 @@ class MyApp(ShowBase):
                                         text_shadow=(0, 0, 0, 1))
 
         # Get building and road data
-        place_name = "Santa Monica Pier, California, USA"
+        place_name = "Santa Monica Pier, California, USA"  # updated location        
         geolocator = Nominatim(user_agent="your_app_name", timeout=10)
 
         location = do_geocode(geolocator, place_name)
@@ -68,11 +72,12 @@ class MyApp(ShowBase):
         if location:
             point = (location.latitude, location.longitude)
             tags = {"building": True}
-            osm_data = ox.features_from_point(point, tags=tags, dist=600) # dist=1000
-            road_data = ox.graph_from_point(point, dist=600, network_type='all')
+            osm_data = ox.features_from_point(point, tags=tags, dist=100) # dist=1000
+            road_data = ox.graph_from_point(point, dist=250, network_type='all')
             
             water_tags = {"natural": ["water", "coastline"], "water": ["sea", "ocean", "lake"]}            
-            water_data = ox.features_from_point(point, tags=water_tags, dist=3500)
+            water_data = ox.features_from_point(point, tags=water_tags, dist=10000)
+            print(f"Number of water bodies fetched: {len(water_data)}")
         else:
             print("Error: Location not found")
 
@@ -163,70 +168,10 @@ class MyApp(ShowBase):
 
                 if not collided_node.isEmpty():
                     print(f"Selected object: {collided_node.getName()}")
+                    self.manipulator.select_object(collided_node)
                 else:
                     print("No object selected")
 
-    """       
-    def create_grass(self, x, y, width, height):
-        # Create a green plane
-        grass = GeomNode('grass')
-        grass_node = self.render.attachNewNode(grass)
-        grass_node.setTag('type', 'grass')
-        grass_node.setColor(0, 1, 0, 1)  # green color
-
-        # Set the position and scale of the plane
-        grass_node.setPos(x * 100000, y * 100000, 0)
-        grass_node.setScale(width * 100000, height * 100000, 1)
-
-
-    def create_street_lamp(self, x, y):
-        # Create a tall, thin rectangle for the lamp post
-        cm = CardMaker('lamp_post')
-        cm.setFrame(-0.05, 0.05, 0, 1)  # create a rectangle
-        lamp_post = self.render.attachNewNode(cm.generate())
-        lamp_post.setPos(x * 100000, y * 100000, 0.5)
-        lamp_post.setColor(0.5, 0.5, 0.5, 1)  # gray color
-
-        # Create a small sphere for the lamp
-        lamp = self.loader.loadModel('models/smiley')
-        lamp.reparentTo(self.render)
-        lamp.setScale(0.05)
-        lamp.setPos(x * 100000, y * 100000, 1)
-
-        # Create a point light at the position of the lamp
-        point_light = PointLight('point_light')
-        point_light.setColor(Vec4(1, 1, 1, 1))
-        plnp = lamp.attachNewNode(point_light)
-        self.render.setLight(plnp)
-
-
-    def create_traffic_light(self, x, y):
-        # Create a thin rectangle for the traffic light
-        cm = CardMaker('traffic_light')
-        cm.setFrame(-0.05, 0.05, 0, 0.3)  # create a rectangle
-        traffic_light = self.render.attachNewNode(cm.generate())
-        traffic_light.setPos(x * 100000, y * 100000, 0.5)
-        traffic_light.setColor(0, 0, 0, 1)  # black color
-
-        # Create small spheres for the lights
-        red_light = self.loader.loadModel('models/smiley')
-        red_light.reparentTo(self.render)
-        red_light.setScale(0.02)
-        red_light.setPos(x * 100000, y * 100000, 0.6)
-        red_light.setColor(1, 0, 0, 1)  # red
-
-        yellow_light = self.loader.loadModel('models/smiley')
-        yellow_light.reparentTo(self.render)
-        yellow_light.setScale(0.02)
-        yellow_light.setPos(x * 100000, y * 100000, 0.5)
-        yellow_light.setColor(1, 1, 0, 1)  # yellow
-
-        green_light = self.loader.loadModel('models/smiley')
-        green_light.reparentTo(self.render)
-        green_light.setScale(0.02)
-        green_light.setPos(x * 100000, y * 100000, 0.4)
-        green_light.setColor(0, 1, 0, 1)  # green
-    """
 
     def create_building(self, polygon, location):
         format = GeomVertexFormat.getV3()
@@ -299,71 +244,6 @@ class MyApp(ShowBase):
         roof_node.setTransparency(TransparencyAttrib.MAlpha)
 
         print("Building node created and colored")
-        """
-        # Create windows
-        window_color = (0.8, 0.8, 0.8, 1)
-        window_width, window_height = 1, 2
-
-        lod_node = LODNode('lod')
-        lod = building_node.attachNewNode(lod_node)
-        lod_node.addSwitch(500, 200)  # Less detailed windows between 200 and 500 units
-        lod_node.addSwitch(200, 0)    # Detailed windows up to 200 units
-
-        for detail, z_step in [(0, window_height * 4), (1, window_height * 2)]:
-            windows_node = lod.attachNewNode('windows')
-            windows_node.setColor(*window_color)
-
-            vdata_windows = GeomVertexData('vertices', format, Geom.UHStatic)
-            vertex_windows = GeomVertexWriter(vdata_windows, 'vertex')
-            geom_windows = Geom(vdata_windows)
-
-            for x, y in polygon.exterior.coords[:-1]:
-                x, y = x - location.longitude, y - location.latitude
-
-                for z in range(0, 10 * 10, z_step):
-                    start = vdata_windows.getNumRows()
-                    vertex_windows.addData3(x * 100000 + window_width / 2, y * 100000, z)
-                    vertex_windows.addData3(x * 100000 + window_width / 2, y * 100000, z + window_height)
-                    vertex_windows.addData3(x * 100000 - window_width / 2, y * 100000, z + window_height)
-                    vertex_windows.addData3(x * 100000 - window_width / 2, y * 100000, z)
-
-                    prim_window = GeomTriangles(Geom.UHStatic)
-                    prim_window.addVertices(start, start + 1, start + 2)
-                    prim_window.addVertices(start + 2, start + 3, start)
-
-                    geom_windows.addPrimitive(prim_window)
-
-            node_windows = GeomNode('windows')
-            node_windows.addGeom(geom_windows)
-            windows_node.attachNewNode(node_windows)
-
-        print("Windows created")
-
-        
-    def create_window(self, x, y, z, width, height):
-        format = GeomVertexFormat.getV3()
-        vdata = GeomVertexData('vertices', format, Geom.UHStatic)
-        vdata.setNumRows(4)
-
-        vertex = GeomVertexWriter(vdata, 'vertex')
-        vertex.addData3(x * 100000 + width / 2, y * 100000, z)
-        vertex.addData3(x * 100000 + width / 2, y * 100000, z + height)
-        vertex.addData3(x * 100000 - width / 2, y * 100000, z + height)
-        vertex.addData3(x * 100000 - width / 2, y * 100000, z)
-
-        prim = GeomTriangles(Geom.UHStatic)
-        prim.addVertices(0, 1, 2)
-        prim.addVertices(2, 3, 0)
-
-        geom = Geom(vdata)
-        geom.addPrimitive(prim)
-
-        node = GeomNode('window')
-        node.addGeom(geom)
-
-        window_node = self.render.attachNewNode(node)
-        window_node.setTag('type', 'window')
-        return window_node
 
 
     def create_road(self, line, location):
@@ -394,22 +274,9 @@ class MyApp(ShowBase):
         road_node.setColor(1, 1, 1, 1)
 
         # Set the road width
-        road_node.setRenderModeThickness(2)
+        road_node.setRenderModeThickness(2) # 2 is fine
+        
 
-        # Create street lamps and traffic lights along the road
-        for i, (x, y) in enumerate(line.coords):
-            # Convert coordinates to a local coordinate system
-            x, y = x - location.longitude, y - location.latitude
-
-            # Create a street lamp at every 5th point
-            if i % 5 == 0:
-                self.create_street_lamp(x, y)
-
-            # Create a traffic light at every 10th point
-            if i % 100 == 0:
-                self.create_traffic_light(x, y)
-
-        """
     def create_water_body(self, polygon, location):
         format = GeomVertexFormat.getV3()  # Format with just the position
         vdata = GeomVertexData('water', format, Geom.UHStatic)
@@ -444,7 +311,8 @@ class MyApp(ShowBase):
         # Add the water body to the scene
         water_node = self.render.attachNewNode(node)
         water_node.setTag('type', 'water')
-        water_node.setColor(0, 0, 1, 1)  # Set water color to blue
+        water_node.setColor(0, 0, 1, 0.5)  # Set water color to semi-transparent blue
+        water_node.setTransparency(TransparencyAttrib.MAlpha)  # Enable transparency
 
         print("Water body created")
             

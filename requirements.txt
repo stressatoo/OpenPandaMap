@@ -1,0 +1,4 @@
+osmnx==1.1.1
+panda3d==1.10.9
+shapely==1.7.1
+geopy==2.2.0
